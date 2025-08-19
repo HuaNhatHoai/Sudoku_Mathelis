@@ -1,275 +1,380 @@
-<script type="text/javascript">
-        var gk_isXlsx = false;
-        var gk_xlsxFileLookup = {};
-        var gk_fileData = {};
-        function filledCell(cell) {
-          return cell !== '' && cell != null;
-        }
-        function loadFileData(filename) {
-        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
-            try {
-                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
-                var firstSheetName = workbook.SheetNames[0];
-                var worksheet = workbook.Sheets[firstSheetName];
-
-                // Convert sheet to JSON to filter blank rows
-                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
-                // Filter out blank rows (rows where all cells are empty, null, or undefined)
-                var filteredData = jsonData.filter(row => row.some(filledCell));
-
-                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
-                var headerRowIndex = filteredData.findIndex((row, index) =>
-                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
-                );
-                // Fallback
-                if (headerRowIndex === -1 || headerRowIndex > 25) {
-                  headerRowIndex = 0;
-                }
-
-                // Convert filtered JSON back to CSV
-                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
-                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
-                return csv;
-            } catch (e) {
-                console.error(e);
-                return "";
-            }
-        }
-        return gk_fileData[filename] || "";
-        }
-        </script><!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sudoku-Mathelis</title>
+    <title>Câu Đố Einstein - 5 Ngôi Nhà</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        .sudoku-grid {
-            display: grid;
-            grid-template-columns: repeat(9, 1fr);
-            gap: 1px;
-            background: linear-gradient(45deg, #8b5cf6, #a855f7);
-            border: 3px solid #8b5cf6;
+        .house {
+            transition: all 0.3s ease;
         }
-        
-        .sudoku-cell {
-            width: 45px;
-            height: 45px;
-            border: none;
-            text-align: center;
-            font-size: 18px;
-            font-weight: bold;
-            background-color: white;
+        .house:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
         }
-        
-        .sudoku-cell:focus {
-            outline: 3px solid #ec4899;
-            background: linear-gradient(135deg, #fce7f3, #f9a8d4);
-            transform: scale(1.05);
+        .draggable {
+            cursor: grab;
             transition: all 0.2s ease;
         }
-        
-        .given-number {
-            background: linear-gradient(135deg, #fbbf24, #f59e0b);
-            color: #ffffff;
-            font-weight: 900;
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+        .draggable:hover {
+            transform: scale(1.05);
         }
-        
-        .user-input {
-            background: linear-gradient(135deg, #e0f2fe, #b3e5fc);
-            color: #0d47a1;
-            font-weight: bold;
+        .draggable.dragging {
+            opacity: 0.5;
+            transform: rotate(5deg);
         }
-        
-        /* Tạo đường viền đậm cho các khối 3x3 */
-        .sudoku-cell:nth-child(3n):not(:nth-child(9n)) {
-            border-right: 2px solid #8b5cf6;
+        .drop-zone {
+            min-height: 40px;
+            border: 2px dashed #cbd5e1;
+            border-radius: 8px;
+            transition: all 0.2s ease;
         }
-        
-        .sudoku-cell:nth-child(n+19):nth-child(-n+27),
-        .sudoku-cell:nth-child(n+46):nth-child(-n+54) {
-            border-bottom: 2px solid #8b5cf6;
+        .drop-zone.drag-over {
+            border-color: #3b82f6;
+            background-color: #eff6ff;
+        }
+        .clue {
+            transition: all 0.3s ease;
+        }
+        .clue:hover {
+            background-color: #f1f5f9;
+            transform: translateX(5px);
         }
     </style>
 </head>
-<body class="bg-gradient-to-br from-pink-100 via-purple-50 to-indigo-100 min-h-screen">
-    <div class="container mx-auto px-4 py-8">
-        <!-- Header -->
-        <div class="text-center mb-8">
-            <h1 class="text-4xl font-bold text-purple-800 mb-2">Sudoku-Mathelis</h1>
-            <p class="text-lg text-gray-600">Mathletica: Đố vui không thưởng #1</p>
-        </div>
-
-        <!-- Game Setup Screen -->
-        <div id="setupScreen" class="max-w-md mx-auto bg-white rounded-lg shadow-lg p-6">
-            <h2 class="text-2xl font-semibold text-center mb-6 text-gray-800">Bắt đầu trò chơi</h2>
-            <div class="mb-4">
-                <label for="playerName" class="block text-sm font-medium text-gray-700 mb-2">Nhập tên của bạn:</label>
-                <input type="text" id="playerName" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Tên người chơi">
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen p-4">
+    <div class="max-w-7xl mx-auto">
+        <!-- Login Screen -->
+        <div id="loginScreen" class="text-center">
+            <div class="bg-white rounded-lg shadow-xl p-8 max-w-md mx-auto">
+                <h1 class="text-4xl font-bold text-gray-800 mb-2">🏠 Câu đố Einstein-Mathelis</h1>
+                <p class="text-lg text-gray-600 mb-1">Mathletica: Đố vui không thưởng #2</p>
+                <p class="text-sm text-gray-500 mb-6">Kéo thả các thuộc tính vào đúng ngôi nhà để giải câu đố!</p>
+                
+                <div class="mb-6">
+                    <label for="playerName" class="block text-sm font-medium text-gray-700 mb-2">Nhập tên của bạn:</label>
+                    <input type="text" id="playerName" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Tên của bạn...">
+                </div>
+                
+                <button id="startGame" class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-semibold transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed" disabled>
+                    🚀 Bắt đầu chơi
+                </button>
             </div>
-            <button onclick="startGame()" class="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white py-2 px-4 rounded-md hover:from-pink-600 hover:to-purple-700 transition duration-200 font-semibold">
-                Bắt đầu
-            </button>
         </div>
 
         <!-- Game Screen -->
         <div id="gameScreen" class="hidden">
-            <div class="max-w-4xl mx-auto">
-                <!-- Game Info -->
-                <div class="bg-white rounded-lg shadow-lg p-4 mb-6">
-                    <div class="flex justify-between items-center">
-                        <div>
-                            <span class="text-lg font-semibold text-gray-700">Người chơi: </span>
-                            <span id="displayName" class="text-lg font-bold text-purple-600"></span>
-                        </div>
-                        <div>
-                            <span class="text-lg font-semibold text-gray-700">Thời gian: </span>
-                            <span id="timer" class="text-lg font-bold text-orange-500">00:00</span>
-                        </div>
+            <div class="text-center mb-8">
+                <h1 class="text-4xl font-bold text-gray-800 mb-2">🏠 Câu đố Einstein-Mathelis</h1>
+                <p class="text-lg text-gray-600">Mathletica: Đố vui không thưởng #2</p>
+                <p class="text-sm text-gray-500 mt-1">Chào <span id="playerNameDisplay" class="font-semibold text-blue-600"></span>! Kéo thả các thuộc tính vào đúng ngôi nhà để giải câu đố!</p>
+                <div class="mt-4 bg-white rounded-lg shadow p-4 inline-block">
+                    <div class="text-lg font-semibold text-gray-700">⏱️ Thời gian: <span id="timer" class="text-blue-600">00:00</span></div>
+                </div>
+            </div>
+
+        <!-- Houses -->
+        <div class="grid grid-cols-5 gap-4 mb-8">
+            <div class="house bg-yellow-100 rounded-lg shadow-lg p-4 border-4 border-yellow-400" data-house="Vàng">
+                <div class="text-center mb-3">
+                    <div class="text-3xl mb-1">
+                        <svg width="32" height="32" viewBox="0 0 32 32" class="mx-auto">
+                            <rect x="4" y="12" width="24" height="16" fill="#fef3c7" stroke="#f59e0b" stroke-width="2"/>
+                            <polygon points="2,12 16,2 30,12" fill="#fef3c7" stroke="#f59e0b" stroke-width="2"/>
+                            <rect x="10" y="18" width="4" height="10" fill="#f59e0b"/>
+                            <rect x="18" y="16" width="6" height="6" fill="#fde68a" stroke="#f59e0b"/>
+                        </svg>
+                    </div>
+                    <div class="font-bold text-yellow-800">Nhà Vàng</div>
+                </div>
+                <div class="space-y-2">
+                    <div class="drop-zone" data-type="nationality" data-house="Vàng">
+                        <div class="text-xs text-yellow-700 p-1 font-medium">Quốc tịch</div>
+                    </div>
+                    <div class="drop-zone" data-type="pet" data-house="Vàng">
+                        <div class="text-xs text-yellow-700 p-1 font-medium">Thú cưng</div>
+                    </div>
+                    <div class="drop-zone" data-type="drink" data-house="Vàng">
+                        <div class="text-xs text-yellow-700 p-1 font-medium">Đồ uống</div>
+                    </div>
+                    <div class="drop-zone" data-type="job" data-house="Vàng">
+                        <div class="text-xs text-yellow-700 p-1 font-medium">Nghề nghiệp</div>
                     </div>
                 </div>
+            </div>
 
-                <!-- Sudoku Grid -->
-                <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
-                    <div class="sudoku-grid mx-auto w-fit">
-                        <!-- Grid cells will be generated by JavaScript -->
+            <div class="house bg-blue-100 rounded-lg shadow-lg p-4 border-4 border-blue-400" data-house="Xanh dương">
+                <div class="text-center mb-3">
+                    <div class="text-3xl mb-1">
+                        <svg width="32" height="32" viewBox="0 0 32 32" class="mx-auto">
+                            <rect x="4" y="12" width="24" height="16" fill="#dbeafe" stroke="#3b82f6" stroke-width="2"/>
+                            <polygon points="2,12 16,2 30,12" fill="#dbeafe" stroke="#3b82f6" stroke-width="2"/>
+                            <rect x="10" y="18" width="4" height="10" fill="#3b82f6"/>
+                            <rect x="18" y="16" width="6" height="6" fill="#93c5fd" stroke="#3b82f6"/>
+                        </svg>
+                    </div>
+                    <div class="font-bold text-blue-800">Nhà Xanh Dương</div>
+                </div>
+                <div class="space-y-2">
+                    <div class="drop-zone" data-type="nationality" data-house="Xanh dương">
+                        <div class="text-xs text-blue-700 p-1 font-medium">Quốc tịch</div>
+                    </div>
+                    <div class="drop-zone" data-type="pet" data-house="Xanh dương">
+                        <div class="text-xs text-blue-700 p-1 font-medium">Thú cưng</div>
+                    </div>
+                    <div class="drop-zone" data-type="drink" data-house="Xanh dương">
+                        <div class="text-xs text-blue-700 p-1 font-medium">Đồ uống</div>
+                    </div>
+                    <div class="drop-zone" data-type="job" data-house="Xanh dương">
+                        <div class="text-xs text-blue-700 p-1 font-medium">Nghề nghiệp</div>
                     </div>
                 </div>
+            </div>
 
-                <!-- Check Button -->
-                <div class="text-center">
-                    <button id="checkButton" onclick="checkSolution()" class="hidden bg-gradient-to-r from-green-400 to-emerald-500 text-white py-3 px-8 rounded-md hover:from-green-500 hover:to-emerald-600 transition duration-200 font-semibold text-lg shadow-lg">
-                        Kiểm tra
-                    </button>
+            <div class="house bg-red-100 rounded-lg shadow-lg p-4 border-4 border-red-400" data-house="Đỏ">
+                <div class="text-center mb-3">
+                    <div class="text-3xl mb-1">
+                        <svg width="32" height="32" viewBox="0 0 32 32" class="mx-auto">
+                            <rect x="4" y="12" width="24" height="16" fill="#fecaca" stroke="#dc2626" stroke-width="2"/>
+                            <polygon points="2,12 16,2 30,12" fill="#fecaca" stroke="#dc2626" stroke-width="2"/>
+                            <rect x="10" y="18" width="4" height="10" fill="#dc2626"/>
+                            <rect x="18" y="16" width="6" height="6" fill="#fca5a5" stroke="#dc2626"/>
+                        </svg>
+                    </div>
+                    <div class="font-bold text-red-800">Nhà Đỏ</div>
+                </div>
+                <div class="space-y-2">
+                    <div class="drop-zone" data-type="nationality" data-house="Đỏ">
+                        <div class="text-xs text-red-700 p-1 font-medium">Quốc tịch</div>
+                    </div>
+                    <div class="drop-zone" data-type="pet" data-house="Đỏ">
+                        <div class="text-xs text-red-700 p-1 font-medium">Thú cưng</div>
+                    </div>
+                    <div class="drop-zone" data-type="drink" data-house="Đỏ">
+                        <div class="text-xs text-red-700 p-1 font-medium">Đồ uống</div>
+                    </div>
+                    <div class="drop-zone" data-type="job" data-house="Đỏ">
+                        <div class="text-xs text-red-700 p-1 font-medium">Nghề nghiệp</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="house bg-gray-100 rounded-lg shadow-lg p-4 border-4 border-gray-400" data-house="Trắng">
+                <div class="text-center mb-3">
+                    <div class="text-3xl mb-1">
+                        <svg width="32" height="32" viewBox="0 0 32 32" class="mx-auto">
+                            <rect x="4" y="12" width="24" height="16" fill="#f8f9fa" stroke="#6b7280" stroke-width="2"/>
+                            <polygon points="2,12 16,2 30,12" fill="#f8f9fa" stroke="#6b7280" stroke-width="2"/>
+                            <rect x="10" y="18" width="4" height="10" fill="#6b7280"/>
+                            <rect x="18" y="16" width="6" height="6" fill="#ddd6fe" stroke="#6b7280"/>
+                        </svg>
+                    </div>
+                    <div class="font-bold text-gray-800">Nhà Trắng</div>
+                </div>
+                <div class="space-y-2">
+                    <div class="drop-zone" data-type="nationality" data-house="Trắng">
+                        <div class="text-xs text-gray-700 p-1 font-medium">Quốc tịch</div>
+                    </div>
+                    <div class="drop-zone" data-type="pet" data-house="Trắng">
+                        <div class="text-xs text-gray-700 p-1 font-medium">Thú cưng</div>
+                    </div>
+                    <div class="drop-zone" data-type="drink" data-house="Trắng">
+                        <div class="text-xs text-gray-700 p-1 font-medium">Đồ uống</div>
+                    </div>
+                    <div class="drop-zone" data-type="job" data-house="Trắng">
+                        <div class="text-xs text-gray-700 p-1 font-medium">Nghề nghiệp</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="house bg-green-100 rounded-lg shadow-lg p-4 border-4 border-green-400" data-house="Xanh lá">
+                <div class="text-center mb-3">
+                    <div class="text-3xl mb-1">
+                        <svg width="32" height="32" viewBox="0 0 32 32" class="mx-auto">
+                            <rect x="4" y="12" width="24" height="16" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+                            <polygon points="2,12 16,2 30,12" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+                            <rect x="10" y="18" width="4" height="10" fill="#16a34a"/>
+                            <rect x="18" y="16" width="6" height="6" fill="#86efac" stroke="#16a34a"/>
+                        </svg>
+                    </div>
+                    <div class="font-bold text-green-800">Nhà Xanh Lá</div>
+                </div>
+                <div class="space-y-2">
+                    <div class="drop-zone" data-type="nationality" data-house="Xanh lá">
+                        <div class="text-xs text-green-700 p-1 font-medium">Quốc tịch</div>
+                    </div>
+                    <div class="drop-zone" data-type="pet" data-house="Xanh lá">
+                        <div class="text-xs text-green-700 p-1 font-medium">Thú cưng</div>
+                    </div>
+                    <div class="drop-zone" data-type="drink" data-house="Xanh lá">
+                        <div class="text-xs text-green-700 p-1 font-medium">Đồ uống</div>
+                    </div>
+                    <div class="drop-zone" data-type="job" data-house="Xanh lá">
+                        <div class="text-xs text-green-700 p-1 font-medium">Nghề nghiệp</div>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- Success Modal -->
-        <div id="successModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div class="bg-white rounded-lg p-8 max-w-md mx-4">
-                <div class="text-center">
-                    <div class="text-6xl mb-4">🎉</div>
-                    <h2 class="text-2xl font-bold text-emerald-600 mb-4">Chúc mừng <span id="winnerName"></span>!</h2>
-                    <p class="text-gray-700 mb-2">Bạn đã hoàn thành Sudoku!</p>
-                    <p class="text-lg font-semibold text-purple-600 mb-6">
-                        Thời gian: <span id="finalTime"></span>
-                    </p>
-                    <button onclick="resetGame()" class="bg-gradient-to-r from-purple-500 to-pink-500 text-white py-2 px-6 rounded-md hover:from-purple-600 hover:to-pink-600 transition duration-200">
-                        Chơi lại
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- Draggable Items -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">🎯 Kéo thả các thuộc tính</h3>
+                
+                <div class="mb-4">
+                    <h4 class="font-semibold text-gray-700 mb-2">Quốc tịch:</h4>
+                    <div class="flex flex-wrap gap-2">
+                        <div class="draggable bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm" draggable="true" data-type="nationality" data-value="Anh">🇬🇧 Anh</div>
+                        <div class="draggable bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm" draggable="true" data-type="nationality" data-value="Tây Ban Nha">🇪🇸 Tây Ban Nha</div>
+                        <div class="draggable bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm" draggable="true" data-type="nationality" data-value="Ukraine">🇺🇦 Ukraine</div>
+                        <div class="draggable bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm" draggable="true" data-type="nationality" data-value="Na Uy">🇳🇴 Na Uy</div>
+                        <div class="draggable bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm" draggable="true" data-type="nationality" data-value="Nhật">🇯🇵 Nhật</div>
+                    </div>
+                </div>
+
+
+
+                <div class="mb-4">
+                    <h4 class="font-semibold text-gray-700 mb-2">Thú cưng:</h4>
+                    <div class="flex flex-wrap gap-2">
+                        <div class="draggable bg-orange-100 text-orange-800 px-3 py-1 rounded-full text-sm" draggable="true" data-type="pet" data-value="Chó">🐕 Chó</div>
+                        <div class="draggable bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm" draggable="true" data-type="pet" data-value="Ốc sên">🐌 Ốc sên</div>
+                        <div class="draggable bg-orange-100 text-orange-800 px-3 py-1 rounded-full text-sm" draggable="true" data-type="pet" data-value="Cáo">🦊 Cáo</div>
+                        <div class="draggable bg-brown-100 text-brown-800 px-3 py-1 rounded-full text-sm" draggable="true" data-type="pet" data-value="Ngựa">🐎 Ngựa</div>
+                        <div class="draggable bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm" draggable="true" data-type="pet" data-value="Ngựa vằn">🦓 Ngựa vằn</div>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <h4 class="font-semibold text-gray-700 mb-2">Đồ uống:</h4>
+                    <div class="flex flex-wrap gap-2">
+                        <div class="draggable bg-brown-100 text-brown-800 px-3 py-1 rounded-full text-sm" draggable="true" data-type="drink" data-value="Cà phê">☕ Cà phê</div>
+                        <div class="draggable bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm" draggable="true" data-type="drink" data-value="Trà">🍵 Trà</div>
+                        <div class="draggable bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm" draggable="true" data-type="drink" data-value="Sữa">🥛 Sữa</div>
+                        <div class="draggable bg-orange-100 text-orange-800 px-3 py-1 rounded-full text-sm" draggable="true" data-type="drink" data-value="Nước cam">🍊 Nước cam</div>
+                        <div class="draggable bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm" draggable="true" data-type="drink" data-value="Nước">💧 Nước</div>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <h4 class="font-semibold text-gray-700 mb-2">Nghề nghiệp:</h4>
+                    <div class="flex flex-wrap gap-2">
+                        <div class="draggable bg-brown-100 text-brown-800 px-3 py-1 rounded-full text-sm" draggable="true" data-type="job" data-value="Thợ mộc">🔨 Thợ mộc</div>
+                        <div class="draggable bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm" draggable="true" data-type="job" data-value="Giáo viên">👨‍🏫 Giáo viên</div>
+                        <div class="draggable bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm" draggable="true" data-type="job" data-value="Làm vườn">🌱 Làm vườn</div>
+                        <div class="draggable bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm" draggable="true" data-type="job" data-value="Bác sĩ">👨‍⚕️ Bác sĩ</div>
+                        <div class="draggable bg-pink-100 text-pink-800 px-3 py-1 rounded-full text-sm" draggable="true" data-type="job" data-value="Thợ làm bánh">👨‍🍳 Thợ làm bánh</div>
+                    </div>
+                </div>
+
+                <div class="mt-6 flex gap-4">
+                    <button id="checkSolution" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-semibold transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed" disabled>
+                        ✅ Kiểm tra đáp án
                     </button>
+                    <button id="resetGame" class="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-lg font-semibold transition-colors">
+                        🔄 Làm lại
+                    </button>
+                </div>
+                <div id="progressInfo" class="mt-4 text-sm text-gray-600 text-center">
+                    Điền tất cả thuộc tính để kiểm tra đáp án (0/20)
+                </div>
+            </div>
+
+            <!-- Clues -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">📝 Gợi ý</h3>
+                <div class="space-y-2 text-sm">
+                    <div class="clue p-3 bg-gray-50 rounded-lg">• Người Anh sống trong ngôi nhà màu đỏ</div>
+                    <div class="clue p-3 bg-gray-50 rounded-lg">• Người Tây Ban Nha sở hữu con chó</div>
+                    <div class="clue p-3 bg-gray-50 rounded-lg">• Cà phê được uống trong ngôi nhà màu xanh lá</div>
+                    <div class="clue p-3 bg-gray-50 rounded-lg">• Người Ukraine uống trà</div>
+                    <div class="clue p-3 bg-gray-50 rounded-lg">• Ngôi nhà màu xanh lá nằm ngay bên phải ngôi nhà màu trắng</div>
+                    <div class="clue p-3 bg-gray-50 rounded-lg">• Thợ mộc sở hữu ốc sên</div>
+                    <div class="clue p-3 bg-gray-50 rounded-lg">• Giáo viên sống trong ngôi nhà màu vàng</div>
+                    <div class="clue p-3 bg-gray-50 rounded-lg">• Sữa được uống trong ngôi nhà số 3</div>
+                    <div class="clue p-3 bg-gray-50 rounded-lg">• Người Na Uy sống trong ngôi nhà số 1</div>
+                    <div class="clue p-3 bg-gray-50 rounded-lg">• Người làm vườn sống cạnh người có con cáo</div>
+                    <div class="clue p-3 bg-gray-50 rounded-lg">• Giáo viên sống cạnh ngôi nhà có nuôi ngựa</div>
+                    <div class="clue p-3 bg-gray-50 rounded-lg">• Bác sĩ uống nước cam</div>
+                    <div class="clue p-3 bg-gray-50 rounded-lg">• Thợ làm bánh là người Nhật</div>
+                    <div class="clue p-3 bg-gray-50 rounded-lg">• Người Na Uy sống cạnh ngôi nhà màu xanh dương</div>
+                </div>
+
+                <div class="mt-6 p-4 bg-yellow-50 border-l-4 border-yellow-400 rounded">
+                    <h4 class="font-bold text-yellow-800 mb-2">🎯 Câu hỏi:</h4>
+                    <p class="text-yellow-700">• Ai uống nước?</p>
+                    <p class="text-yellow-700">• Ai sở hữu ngựa vằn?</p>
                 </div>
             </div>
         </div>
 
-        <!-- Error Modal -->
-        <div id="errorModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <!-- Result Modal -->
+        <div id="resultModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
             <div class="bg-white rounded-lg p-8 max-w-md mx-4">
-                <div class="text-center">
-                    <div class="text-6xl mb-4">❌</div>
-                    <h2 class="text-2xl font-bold text-red-600 mb-4">Chưa đúng!</h2>
-                    <p class="text-gray-700 mb-6">Vui lòng kiểm tra lại và thử lại.</p>
-                    <button onclick="closeErrorModal()" class="bg-gradient-to-r from-red-400 to-pink-500 text-white py-2 px-6 rounded-md hover:from-red-500 hover:to-pink-600 transition duration-200">
-                        Thử lại
-                    </button>
+                <div id="resultContent" class="text-center">
+                    <!-- Result content will be inserted here -->
                 </div>
+                <button id="closeModal" class="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-semibold w-full transition-colors">
+                    Đóng
+                </button>
             </div>
+        </div>
         </div>
     </div>
 
     <script>
-        // Đề bài Sudoku
-        const puzzle = [
-            [1, 3, 9, 4, 8, 7, 0, 0, 0],
-            [0, 0, 0, 1, 0, 0, 0, 9, 3],
-            [0, 0, 0, 9, 0, 0, 0, 0, 0],
-            [0, 7, 4, 0, 0, 9, 0, 1, 0],
-            [0, 0, 6, 0, 0, 0, 9, 0, 0],
-            [2, 9, 0, 5, 4, 0, 3, 0, 0],
-            [4, 0, 8, 0, 0, 0, 5, 7, 0],
-            [0, 6, 5, 8, 0, 4, 0, 0, 0],
-            [0, 0, 0, 0, 5, 1, 4, 0, 0]
-        ];
+        // Game variables
+        let playerName = '';
+        let startTime = null;
+        let timerInterval = null;
+        let usedItems = new Set(); // Track used items
 
-        // Đáp án đúng
-        const solution = [
-            [1, 3, 9, 4, 8, 7, 6, 2, 5],
-            [6, 4, 7, 1, 2, 5, 8, 9, 3],
-            [8, 5, 2, 9, 3, 6, 7, 4, 1],
-            [5, 7, 4, 3, 6, 9, 2, 1, 8],
-            [3, 8, 6, 7, 1, 2, 9, 5, 4],
-            [2, 9, 1, 5, 4, 8, 3, 6, 7],
-            [4, 1, 8, 2, 9, 3, 5, 7, 6],
-            [9, 6, 5, 8, 7, 4, 1, 3, 2],
-            [7, 2, 3, 6, 5, 1, 4, 8, 9]
-        ];
+        // Game state - using color as house identifier
+        let gameState = {
+            "Vàng": {nationality: null, pet: null, drink: null, job: null},
+            "Xanh dương": {nationality: null, pet: null, drink: null, job: null},
+            "Đỏ": {nationality: null, pet: null, drink: null, job: null},
+            "Trắng": {nationality: null, pet: null, drink: null, job: null},
+            "Xanh lá": {nationality: null, pet: null, drink: null, job: null}
+        };
 
-        let startTime;
-        let timerInterval;
-        let cells = [];
+        // Correct solution - using color as house identifier
+        const correctSolution = {
+            "Vàng": {nationality: "Na Uy", pet: "Cáo", drink: "Nước", job: "Giáo viên"},
+            "Xanh dương": {nationality: "Ukraine", pet: "Ngựa", drink: "Trà", job: "Làm vườn"},
+            "Đỏ": {nationality: "Anh", pet: "Ốc sên", drink: "Sữa", job: "Thợ mộc"},
+            "Trắng": {nationality: "Tây Ban Nha", pet: "Chó", drink: "Nước cam", job: "Bác sĩ"},
+            "Xanh lá": {nationality: "Nhật", pet: "Ngựa vằn", drink: "Cà phê", job: "Thợ làm bánh"}
+        };
 
-        function startGame() {
-            const playerName = document.getElementById('playerName').value.trim();
-            if (!playerName) {
-                alert('Vui lòng nhập tên của bạn!');
-                return;
+        // Login functionality
+        const playerNameInput = document.getElementById('playerName');
+        const startGameBtn = document.getElementById('startGame');
+        const loginScreen = document.getElementById('loginScreen');
+        const gameScreen = document.getElementById('gameScreen');
+        const playerNameDisplay = document.getElementById('playerNameDisplay');
+        const timerDisplay = document.getElementById('timer');
+
+        playerNameInput.addEventListener('input', function() {
+            startGameBtn.disabled = this.value.trim().length === 0;
+        });
+
+        playerNameInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !startGameBtn.disabled) {
+                startGameFunction();
             }
+        });
 
-            document.getElementById('displayName').textContent = playerName;
-            document.getElementById('setupScreen').classList.add('hidden');
-            document.getElementById('gameScreen').classList.remove('hidden');
+        startGameBtn.addEventListener('click', startGameFunction);
 
-            createGrid();
-            startTimer();
-        }
-
-        function createGrid() {
-            const grid = document.querySelector('.sudoku-grid');
-            grid.innerHTML = '';
-            cells = [];
-
-            for (let row = 0; row < 9; row++) {
-                for (let col = 0; col < 9; col++) {
-                    const cell = document.createElement('input');
-                    cell.type = 'text';
-                    cell.className = 'sudoku-cell';
-                    cell.maxLength = 1;
-                    
-                    if (puzzle[row][col] !== 0) {
-                        cell.value = puzzle[row][col];
-                        cell.classList.add('given-number');
-                        cell.readOnly = true;
-                    } else {
-                        cell.classList.add('user-input');
-                        cell.addEventListener('input', handleInput);
-                        cell.addEventListener('input', checkIfComplete);
-                    }
-                    
-                    cell.dataset.row = row;
-                    cell.dataset.col = col;
-                    grid.appendChild(cell);
-                    cells.push(cell);
-                }
-            }
-        }
-
-        function handleInput(e) {
-            const value = e.target.value;
-            if (!/^[1-9]$/.test(value)) {
-                e.target.value = '';
-            }
-        }
-
-        function checkIfComplete() {
-            const userInputs = cells.filter(cell => cell.classList.contains('user-input'));
-            const allFilled = userInputs.every(cell => cell.value !== '');
-            
-            if (allFilled) {
-                document.getElementById('checkButton').classList.remove('hidden');
-            } else {
-                document.getElementById('checkButton').classList.add('hidden');
+        function startGameFunction() {
+            playerName = playerNameInput.value.trim();
+            if (playerName) {
+                playerNameDisplay.textContent = playerName;
+                loginScreen.classList.add('hidden');
+                gameScreen.classList.remove('hidden');
+                startTimer();
             }
         }
 
@@ -282,49 +387,214 @@
             const elapsed = Math.floor((Date.now() - startTime) / 1000);
             const minutes = Math.floor(elapsed / 60);
             const seconds = elapsed % 60;
-            document.getElementById('timer').textContent = 
-                `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        function stopTimer() {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+        }
+
+        function getElapsedTime() {
+            if (startTime) {
+                const elapsed = Math.floor((Date.now() - startTime) / 1000);
+                const minutes = Math.floor(elapsed / 60);
+                const seconds = elapsed % 60;
+                return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            }
+            return '00:00';
+        }
+
+        // Drag and drop functionality
+        let draggedElement = null;
+
+        document.querySelectorAll('.draggable').forEach(item => {
+            item.addEventListener('dragstart', function(e) {
+                draggedElement = this;
+                this.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+            });
+
+            item.addEventListener('dragend', function(e) {
+                this.classList.remove('dragging');
+                draggedElement = null;
+            });
+        });
+
+        document.querySelectorAll('.drop-zone').forEach(zone => {
+            zone.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                this.classList.add('drag-over');
+            });
+
+            zone.addEventListener('dragleave', function(e) {
+                this.classList.remove('drag-over');
+            });
+
+            zone.addEventListener('drop', function(e) {
+                e.preventDefault();
+                this.classList.remove('drag-over');
+                
+                if (draggedElement && draggedElement.dataset.type === this.dataset.type) {
+                    // Remove any existing item in this slot
+                    const existingItem = this.querySelector('.draggable');
+                    if (existingItem) {
+                        // Return the existing item to available items
+                        const existingValue = existingItem.dataset.value;
+                        usedItems.delete(existingValue);
+                        existingItem.remove();
+                    }
+
+                    // Clone the dragged element
+                    const clonedElement = draggedElement.cloneNode(true);
+                    clonedElement.classList.remove('dragging');
+                    
+                    // Add to used items and hide original
+                    const itemValue = draggedElement.dataset.value;
+                    usedItems.add(itemValue);
+                    draggedElement.style.display = 'none';
+                    
+                    // Add remove functionality
+                    clonedElement.addEventListener('click', function() {
+                        // Return item to available items
+                        usedItems.delete(itemValue);
+                        draggedElement.style.display = 'inline-block';
+                        this.remove();
+                        updateGameState();
+                    });
+
+                    this.appendChild(clonedElement);
+                    updateGameState();
+                }
+            });
+        });
+
+        function updateGameState() {
+            // Reset game state
+            for (let house in gameState) {
+                for (let type in gameState[house]) {
+                    gameState[house][type] = null;
+                }
+            }
+
+            // Update game state based on current placements
+            document.querySelectorAll('.drop-zone').forEach(zone => {
+                const item = zone.querySelector('.draggable');
+                if (item) {
+                    const house = zone.dataset.house;
+                    const type = zone.dataset.type;
+                    const value = item.dataset.value;
+                    gameState[house][type] = value;
+                }
+            });
+
+            // Update progress and enable/disable check button
+            updateProgress();
+        }
+
+        function updateProgress() {
+            let filledSlots = 0;
+            const totalSlots = 20; // 5 houses × 4 attributes each
+
+            for (let house in gameState) {
+                for (let type in gameState[house]) {
+                    if (gameState[house][type] !== null) {
+                        filledSlots++;
+                    }
+                }
+            }
+
+            const progressInfo = document.getElementById('progressInfo');
+            const checkButton = document.getElementById('checkSolution');
+            
+            progressInfo.textContent = `Điền tất cả thuộc tính để kiểm tra đáp án (${filledSlots}/${totalSlots})`;
+            
+            if (filledSlots === totalSlots) {
+                checkButton.disabled = false;
+                progressInfo.textContent = `Đã điền đủ! Nhấn kiểm tra đáp án (${filledSlots}/${totalSlots})`;
+                progressInfo.classList.add('text-green-600', 'font-semibold');
+                progressInfo.classList.remove('text-gray-600');
+            } else {
+                checkButton.disabled = true;
+                progressInfo.classList.remove('text-green-600', 'font-semibold');
+                progressInfo.classList.add('text-gray-600');
+            }
         }
 
         function checkSolution() {
-            let isCorrect = true;
-            
-            for (let row = 0; row < 9; row++) {
-                for (let col = 0; col < 9; col++) {
-                    const cellIndex = row * 9 + col;
-                    const cellValue = parseInt(cells[cellIndex].value);
-                    
-                    if (cellValue !== solution[row][col]) {
-                        isCorrect = false;
-                        break;
+            let correct = true;
+            let correctCount = 0;
+            let totalSlots = 20;
+
+            for (let house in correctSolution) {
+                for (let type in correctSolution[house]) {
+                    if (gameState[house][type] === correctSolution[house][type]) {
+                        correctCount++;
+                    } else {
+                        correct = false;
                     }
                 }
-                if (!isCorrect) break;
             }
 
-            if (isCorrect) {
-                clearInterval(timerInterval);
-                const finalTime = document.getElementById('timer').textContent;
-                document.getElementById('finalTime').textContent = finalTime;
-                document.getElementById('winnerName').textContent = document.getElementById('displayName').textContent;
-                document.getElementById('successModal').classList.remove('hidden');
+            const modal = document.getElementById('resultModal');
+            const content = document.getElementById('resultContent');
+
+            if (correctCount === totalSlots && correct) {
+                stopTimer();
+                const completionTime = getElapsedTime();
+                content.innerHTML = `
+                    <div class="text-6xl mb-4">🎉</div>
+                    <h3 class="text-2xl font-bold text-green-600 mb-2">Chúc mừng ${playerName}!</h3>
+                    <p class="text-gray-700 mb-2">Bạn đã giải đúng câu đố Einstein!</p>
+                    <p class="text-lg font-semibold text-blue-600 mb-4">⏱️ Thời gian hoàn thành: ${completionTime}</p>
+                    <div class="bg-green-50 p-4 rounded-lg">
+                        <p class="font-semibold text-green-800">Đáp án:</p>
+                        <p class="text-green-700">• Người Na Uy (nhà vàng) uống nước</p>
+                        <p class="text-green-700">• Người Nhật (nhà xanh lá) sở hữu ngựa vằn</p>
+                    </div>
+                `;
             } else {
-                document.getElementById('errorModal').classList.remove('hidden');
+                content.innerHTML = `
+                    <div class="text-6xl mb-4">🤔</div>
+                    <h3 class="text-2xl font-bold text-orange-600 mb-2">Chưa đúng!</h3>
+                    <p class="text-gray-700 mb-2">Bạn đã điền đúng ${correctCount}/${totalSlots} thuộc tính.</p>
+                    <p class="text-gray-600">Hãy kiểm tra lại các gợi ý và thử lại!</p>
+                `;
             }
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
         }
 
-        function closeErrorModal() {
-            document.getElementById('errorModal').classList.add('hidden');
-        }
+
 
         function resetGame() {
-            document.getElementById('successModal').classList.add('hidden');
-            document.getElementById('gameScreen').classList.add('hidden');
-            document.getElementById('setupScreen').classList.remove('hidden');
-            document.getElementById('playerName').value = '';
-            document.getElementById('checkButton').classList.add('hidden');
-            clearInterval(timerInterval);
+            document.querySelectorAll('.drop-zone .draggable').forEach(item => item.remove());
+            // Show all hidden items
+            document.querySelectorAll('.draggable[style*="display: none"]').forEach(item => {
+                item.style.display = 'inline-block';
+            });
+            usedItems.clear();
+            updateGameState();
         }
+
+        // Event listeners
+        document.getElementById('checkSolution').addEventListener('click', checkSolution);
+        document.getElementById('resetGame').addEventListener('click', resetGame);
+        document.getElementById('closeModal').addEventListener('click', function() {
+            document.getElementById('resultModal').classList.add('hidden');
+            document.getElementById('resultModal').classList.remove('flex');
+        });
+
+        // Close modal when clicking outside
+        document.getElementById('resultModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                this.classList.add('hidden');
+                this.classList.remove('flex');
+            }
+        });
     </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9701f69814429fc7',t:'MTc1NTM1ODEyNS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9716a2854325c9c6',t:'MTc1NTU3NDg4Mi4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
